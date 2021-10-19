@@ -63,6 +63,6 @@ The farm contract interacts with only five other contracts, all of which are aud
 
 ## References
 
-"Seasonal Tokens White Paper"
+*Seasonal Tokens White Paper*
 <br>
     https://github.com/seasonaltokens/seasonaltokens/blob/main/whitepaper/whitepaper.md
