@@ -24,7 +24,7 @@ Because the farm receives and distributes voluntary donations, there is no guara
 
 The mining pool at <code>pool.seasonaltokens.org</code> donates 9% of the tokens mined to the farm. In the future, miners could choose to mine solo, or use a different mining pool that doesn't donate to the farm. The 9% donation may need to be reduced to prevent miners from diverting their hashpower to a different pool.
 
-Ultimately, the miners have control over the percentage of newly-mined tokens donated to the farm. While there is a general acknowledgement among miners that the provision of liquidity should be subsidized, donations are likely to continue.
+Ultimately, the miners have control over the percentage of newly-mined tokens donated to the farm. While there is a common agreement among miners that the provision of liquidity should be subsidized, donations are likely to continue.
 
 A time may come when liquidity is plentiful and subsidies are not needed, in the opinion of the miners. So the farm may have a natural economic lifespan, after which it is no longer needed.
 
