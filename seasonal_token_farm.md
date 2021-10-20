@@ -6,7 +6,7 @@ Seasonal tokens become scarce one after another, at mine month intervals, becaus
 
 For this to be a feasible investment strategy, the market must be liquid enough to allow individual traders to make their trades without significantly changing the price, and must also be responsive to the scarcity of the tokens. The seasonal token farm facilitates this by allowing liquidity providers to receive a fraction of the newly mined tokens.
 
-The farm receives voluntary donations of tokens from miners and mining pools, and distributes these to providers of liquidity to the seasonal token/ethereum trading pairs on Uniswap. Each trading pair is allocated a certain proportion of the incoming tokens, which are distributed to liquidity providers in proportion to the liquidity they provide. The proportion changes every nine months to ensure that the token whose new scarcity is expected to affect its price is the one whose trading pair is allocated the largest share of tokens from the farm.
+The farm receives voluntary donations of tokens from miners and mining pools, and distributes these to providers of liquidity to the seasonal token/ethereum trading pairs on Uniswap. Each trading pair is allocated a certain fraction of the incoming tokens, which are distributed to liquidity providers in proportion to the liquidity they provide. The fraction changes every nine months to ensure that the token whose new scarcity is expected to affect its price is the one whose trading pair is allocated the largest share of tokens from the farm.
 
 
 ## Introduction
