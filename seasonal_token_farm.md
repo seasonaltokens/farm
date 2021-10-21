@@ -72,6 +72,28 @@ Because voluntary donations are the source of the funds, the contract code can b
 The farm contract interacts with only five other contracts, all of which are audited and trusted: The Uniswap Position Manager, and the seasonal token contracts.
 
 
+## Contract Functions
+
+The farm contract allows four principal operations: depositing liquidity positions, withdrawing, harvesting, and donating.
+
+Miners and mining pools can donate seasonal tokens to the farm by calling the <code>safeApproveAndCall</code> function of the seasonal token contracts. This approves the farm to spend the specified number of tokens and calls the farm's <code>receiveApproval</code> function, which transfers the ownership of the tokens from the donor to the farm and allocates the incoming tokens to the liquidity providers for the four trading pairs. 
+
+To deposit a liquidity position into the farm, the user calls the <code>safeTransferFrom</code> function of the Uniswap Position Manager contract, and transfers ownership of the non-fungible token representing the liquidity position to the farm. The Uniswap Position Manager contract then calls the <code>onERC721Received</code> function of the farm contract, which records the receipt of that liquidity position token from that user.
+
+When a user has deposited a liquidity position, that user can call the <code>harvest</code> function of the farm contract, which sends all of the tokens distributed to that liquidity position to the user's ethereum address. The user or user interface can call the <code>getPayoutSizes</code> function of the contract to find out how many tokens of the four types are available for haversting.
+
+Users can withdraw their deposited liquidity position tokens by calling the <code>withdraw</code> function of the farm contract. This harvests their farmed tokens, transfers the liquidity position token back to the user, and records the reduction of the total liquidity in the farm. The farm contract provides a <code>canWithdraw</code> function that reports whether a specific liquidity token can be withdrawn at the present time, as well as a <code>nextWithdrawalTime</code> function that reports the time at which the next withdrawal window will begin.
+
+
+## Disclaimer
+
+This document specifies the characteristics of the seasonal token farm. Nothing in this document should be interpreted as investment advice, a promise of any kind, or a guarantee of future prices. The authors will not be liable for any losses incurred by anybody using the farm.
+
+
 ## References
 
 *Seasonal Tokens White Paper*, https://github.com/seasonaltokens/seasonaltokens/blob/main/whitepaper/whitepaper.md
+
+*Uniswap v3 White Paper*, https://uniswap.org/whitepaper-v3.pdf
+
+*EIP-721 Non-Fungible Token Standard*, https://eips.ethereum.org/EIPS/eip-721
