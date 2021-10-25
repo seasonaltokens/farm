@@ -239,12 +239,28 @@ def farm_with_liquidity_in_three_pairs(accounts, position_manager_with_four_liqu
     return farm
 
 
-def test_donate_to_farm_with_liquidity_in_three_pairs(accounts, farm_with_liquidity_in_three_pairs, spring):
+def test_harvest_from_farm_with_donations_and_liquidity_in_three_pairs(accounts, farm_with_liquidity_in_three_pairs, 
+                                                      spring, summer, autumn, winter):
     spring.setBalance(accounts[0].address, int(10**18))
     spring.safeApproveAndCall(farm_with_liquidity_in_three_pairs.address, 0, int(10**18), bytes(), 
                               {'from': accounts[0]})
     assert spring.balanceOf(accounts[0].address) == 0
     assert spring.balanceOf(farm_with_liquidity_in_three_pairs.address) == int(10**18)
+    summer.setBalance(accounts[0].address, int(10**18))
+    summer.safeApproveAndCall(farm_with_liquidity_in_three_pairs.address, 0, int(10**18), bytes(), 
+                              {'from': accounts[0]})
+    assert summer.balanceOf(accounts[0].address) == 0
+    assert summer.balanceOf(farm_with_liquidity_in_three_pairs.address) == int(10**18)
+    autumn.setBalance(accounts[0].address, int(10**18))
+    autumn.safeApproveAndCall(farm_with_liquidity_in_three_pairs.address, 0, int(10**18), bytes(), 
+                              {'from': accounts[0]})
+    assert autumn.balanceOf(accounts[0].address) == 0
+    assert autumn.balanceOf(farm_with_liquidity_in_three_pairs.address) == int(10**18)
+
+    assert farm_with_liquidity_in_three_pairs.getPayoutSizes(0) != (0, 0, 0, 0)
+    farm_with_liquidity_in_three_pairs.harvest(0, {'from': accounts[0]})
+    assert farm_with_liquidity_in_three_pairs.getPayoutSizes(0) == (0, 0, 0, 0)
+
 
 def test_withdraw_from_farm_with_liquidity_in_three_pairs(accounts, farm_with_liquidity_in_three_pairs):
     assert farm_with_liquidity_in_three_pairs.balanceOf(accounts[0].address) == 3

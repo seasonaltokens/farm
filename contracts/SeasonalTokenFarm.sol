@@ -5,7 +5,6 @@ pragma solidity 0.8.5;
 pragma abicoder v2;
 
 import "../interfaces/ERC20.sol";
-import "../interfaces/Owned.sol";
 import "../interfaces/ERC721TokenReceiver.sol";
 import "../interfaces/ApproveAndCallFallBack.sol";
 
@@ -35,13 +34,13 @@ interface INonfungiblePositionManager {
 struct LiquidityToken {
     address owner;
     address seasonalToken;
-    uint depositTime;
-    uint initialCumulativeSpringTokensFarmed;
-    uint initialCumulativeSummerTokensFarmed;
-    uint initialCumulativeAutumnTokensFarmed;
-    uint initialCumulativeWinterTokensFarmed;
-    uint liquidity;
-    uint position;
+    uint256 depositTime;
+    uint256 initialCumulativeSpringTokensFarmed;
+    uint256 initialCumulativeSummerTokensFarmed;
+    uint256 initialCumulativeAutumnTokensFarmed;
+    uint256 initialCumulativeWinterTokensFarmed;
+    uint256 liquidity;
+    uint256 position;
 }
 
 contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
@@ -81,9 +80,9 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
     // trading pair. Incoming tokens allocated to that trading pair are distributed to liquidity
     // token owners in proportion to the liquidity they have provided.
 
-    mapping(address => uint) public totalLiquidity;
-    mapping(address => uint[]) public tokenOfOwnerByIndex;
-    mapping(uint => LiquidityToken) public liquidityTokens;
+    mapping(address => uint256) public totalLiquidity;
+    mapping(address => uint256[]) public tokenOfOwnerByIndex;
+    mapping(uint256 => LiquidityToken) public liquidityTokens;
 
     address public immutable springTokenAddress;
     address public immutable summerTokenAddress;
@@ -106,9 +105,9 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
     //
     // cumulativeTokensFarmedPerUnitLiquidity[trading_pair_token][farmed_token] = farmed tokens/liquidity
 
-    mapping(address => mapping(address => uint)) public cumulativeTokensFarmedPerUnitLiquidity;
+    mapping(address => mapping(address => uint256)) public cumulativeTokensFarmedPerUnitLiquidity;
 
-    event Deposit(address indexed from, uint liquidityTokenId);
+    event Deposit(address indexed from, uint256 liquidityTokenId);
     event Withdraw(address indexed tokenOwner, uint256 liquidityTokenId);
     event Donate(address indexed from, address seasonalTokenAddress, uint256 amount);
     event Harvest(address indexed tokenOwner, uint256 liquidityTokenId, 
@@ -134,14 +133,14 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         startTime = startTime_;
     }
 
-    function balanceOf(address liquidityProvider) external view returns (uint) {
+    function balanceOf(address liquidityProvider) external view returns (uint256) {
         return tokenOfOwnerByIndex[liquidityProvider].length;
     }
 
     function numberOfReallocations() internal view returns (uint256) {
         if (block.timestamp < startTime + REALLOCATION_INTERVAL)
             return 0;
-        uint timeSinceStart = block.timestamp - startTime;
+        uint256 timeSinceStart = block.timestamp - startTime;
         return timeSinceStart / REALLOCATION_INTERVAL;
     }
 
@@ -169,10 +168,10 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         return 8;
     }
 
-    function getEffectiveTotalAllocationSize(uint totalSpringLiquidity, 
-                                             uint totalSummerLiquidity,
-                                             uint totalAutumnLiquidity,
-                                             uint totalWinterLiquidity) internal view returns (uint256) {
+    function getEffectiveTotalAllocationSize(uint256 totalSpringLiquidity, 
+                                             uint256 totalSummerLiquidity,
+                                             uint256 totalAutumnLiquidity,
+                                             uint256 totalWinterLiquidity) internal view returns (uint256) {
         uint256 effectiveTotal = 0;
 
         if (totalSpringLiquidity > 0)
@@ -187,24 +186,24 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         return effectiveTotal;
     }
 
-    function allocateIncomingTokensToTradingPairs(address incomingTokenAddress, uint amount) internal {
+    function allocateIncomingTokensToTradingPairs(address incomingTokenAddress, uint256 amount) internal {
 
-        uint totalSpringLiquidity = totalLiquidity[springTokenAddress];
-        uint totalSummerLiquidity = totalLiquidity[summerTokenAddress];
-        uint totalAutumnLiquidity = totalLiquidity[autumnTokenAddress];
-        uint totalWinterLiquidity = totalLiquidity[winterTokenAddress];
+        uint256 totalSpringLiquidity = totalLiquidity[springTokenAddress];
+        uint256 totalSummerLiquidity = totalLiquidity[summerTokenAddress];
+        uint256 totalAutumnLiquidity = totalLiquidity[autumnTokenAddress];
+        uint256 totalWinterLiquidity = totalLiquidity[winterTokenAddress];
 
-        uint effectiveTotalAllocationSize = getEffectiveTotalAllocationSize(totalSpringLiquidity,
-                                                                            totalSummerLiquidity,
-                                                                            totalAutumnLiquidity,
-                                                                            totalWinterLiquidity);
+        uint256 effectiveTotalAllocationSize = getEffectiveTotalAllocationSize(totalSpringLiquidity,
+                                                                               totalSummerLiquidity,
+                                                                               totalAutumnLiquidity,
+                                                                               totalWinterLiquidity);
 
         require(effectiveTotalAllocationSize > 0, "No liquidity in farm");
 
-        uint springPairAllocation = (amount * springAllocationSize()) / effectiveTotalAllocationSize;
-        uint summerPairAllocation = (amount * summerAllocationSize()) / effectiveTotalAllocationSize;
-        uint autumnPairAllocation = (amount * autumnAllocationSize()) / effectiveTotalAllocationSize;
-        uint winterPairAllocation = (amount * winterAllocationSize()) / effectiveTotalAllocationSize;
+        uint256 springPairAllocation = (amount * springAllocationSize()) / effectiveTotalAllocationSize;
+        uint256 summerPairAllocation = (amount * summerAllocationSize()) / effectiveTotalAllocationSize;
+        uint256 autumnPairAllocation = (amount * autumnAllocationSize()) / effectiveTotalAllocationSize;
+        uint256 winterPairAllocation = (amount * winterAllocationSize()) / effectiveTotalAllocationSize;
 
         if (totalSpringLiquidity > 0)
             cumulativeTokensFarmedPerUnitLiquidity[springTokenAddress][incomingTokenAddress] 
@@ -228,7 +227,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         receiveSeasonalTokens(from, token, tokens);
     }
 
-    function receiveSeasonalTokens(address from, address tokenAddress, uint amount) public {
+    function receiveSeasonalTokens(address from, address tokenAddress, uint256 amount) public {
         
         allocateIncomingTokensToTradingPairs(tokenAddress, amount);
 
@@ -269,14 +268,14 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     }
 
-    function getLiquidityToken(uint tokenId) internal view returns(LiquidityToken memory) {
+    function getLiquidityToken(uint256 tokenId) internal view returns(LiquidityToken memory) {
 
         LiquidityToken memory liquidityToken;
         address token0;
         address token1;
         int24 tickLower;
         int24 tickUpper;
-        uint liquidity;
+        uint256 liquidity;
         
         (token0, token1, tickLower, tickUpper, liquidity) = getPositionDataForLiquidityToken(tokenId);
         liquidityToken.liquidity = liquidity;
@@ -300,42 +299,42 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         return liquidityToken;
     }
 
-    function getPositionDataForLiquidityToken(uint tokenId) 
-                                             internal view returns (address, address, int24, int24, uint){
+    function getPositionDataForLiquidityToken(uint256 tokenId) 
+                                             internal view returns (address, address, int24, int24, uint256){
         address token0;
         address token1;
         int24 tickLower;
         int24 tickUpper;
-        uint liquidity;
+        uint256 liquidity;
         (,, token0, token1,, tickLower, tickUpper, liquidity,,,,) 
             = nonfungiblePositionManager.positions(tokenId);
         return (token0, token1, tickLower, tickUpper, liquidity);
     }
 
-    function setCumulativeSpringTokensFarmedToCurrentValue(uint liquidityTokenId, address seasonalToken) internal {
+    function setCumulativeSpringTokensFarmedToCurrentValue(uint256 liquidityTokenId, address seasonalToken) internal {
         liquidityTokens[liquidityTokenId].initialCumulativeSpringTokensFarmed
             = cumulativeTokensFarmedPerUnitLiquidity[seasonalToken][springTokenAddress];
     }
 
-    function setCumulativeSummerTokensFarmedToCurrentValue(uint liquidityTokenId, address seasonalToken) internal {
+    function setCumulativeSummerTokensFarmedToCurrentValue(uint256 liquidityTokenId, address seasonalToken) internal {
         liquidityTokens[liquidityTokenId].initialCumulativeSummerTokensFarmed
             = cumulativeTokensFarmedPerUnitLiquidity[seasonalToken][summerTokenAddress];
     }
 
-    function setCumulativeAutumnTokensFarmedToCurrentValue(uint liquidityTokenId, address seasonalToken) internal {
+    function setCumulativeAutumnTokensFarmedToCurrentValue(uint256 liquidityTokenId, address seasonalToken) internal {
         liquidityTokens[liquidityTokenId].initialCumulativeAutumnTokensFarmed
             = cumulativeTokensFarmedPerUnitLiquidity[seasonalToken][autumnTokenAddress];
     }
 
-    function setCumulativeWinterTokensFarmedToCurrentValue(uint liquidityTokenId, address seasonalToken) internal {
+    function setCumulativeWinterTokensFarmedToCurrentValue(uint256 liquidityTokenId, address seasonalToken) internal {
         liquidityTokens[liquidityTokenId].initialCumulativeWinterTokensFarmed
             = cumulativeTokensFarmedPerUnitLiquidity[seasonalToken][winterTokenAddress];
     }
 
-    function getPayoutSize(uint liquidityTokenId, address farmedSeasonalToken, 
-                           address tradingPairSeasonalToken) internal view returns (uint){
+    function getPayoutSize(uint256 liquidityTokenId, address farmedSeasonalToken, 
+                           address tradingPairSeasonalToken) internal view returns (uint256){
 
-        uint initialCumulativeTokensFarmed;
+        uint256 initialCumulativeTokensFarmed;
 
         if (farmedSeasonalToken == springTokenAddress)
             initialCumulativeTokensFarmed = liquidityTokens[liquidityTokenId].initialCumulativeSpringTokensFarmed;
@@ -346,7 +345,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         else
             initialCumulativeTokensFarmed = liquidityTokens[liquidityTokenId].initialCumulativeWinterTokensFarmed;
 
-        uint tokensFarmedPerUnitLiquiditySinceDeposit 
+        uint256 tokensFarmedPerUnitLiquiditySinceDeposit 
             = cumulativeTokensFarmedPerUnitLiquidity[tradingPairSeasonalToken][farmedSeasonalToken]
               - initialCumulativeTokensFarmed;
 
@@ -354,88 +353,107 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
                 * liquidityTokens[liquidityTokenId].liquidity) / (2 ** 128);
     }
 
-    function getPayoutSizes(uint liquidityTokenId) public view returns (uint, uint, uint, uint) {
+    function getPayoutSizes(uint256 liquidityTokenId) public view returns (uint256, uint256, uint256, uint256) {
 
         address tradingPairSeasonalToken = liquidityTokens[liquidityTokenId].seasonalToken;
 
-        uint springPayout = getPayoutSize(liquidityTokenId, springTokenAddress, tradingPairSeasonalToken);
-        uint summerPayout = getPayoutSize(liquidityTokenId, summerTokenAddress, tradingPairSeasonalToken);
-        uint autumnPayout = getPayoutSize(liquidityTokenId, autumnTokenAddress, tradingPairSeasonalToken);
-        uint winterPayout = getPayoutSize(liquidityTokenId, winterTokenAddress, tradingPairSeasonalToken);
+        uint256 springPayout = getPayoutSize(liquidityTokenId, springTokenAddress, tradingPairSeasonalToken);
+        uint256 summerPayout = getPayoutSize(liquidityTokenId, summerTokenAddress, tradingPairSeasonalToken);
+        uint256 autumnPayout = getPayoutSize(liquidityTokenId, autumnTokenAddress, tradingPairSeasonalToken);
+        uint256 winterPayout = getPayoutSize(liquidityTokenId, winterTokenAddress, tradingPairSeasonalToken);
 
         return (springPayout, summerPayout, autumnPayout, winterPayout);
     }
 
-    function harvestSpring(uint liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestSpring(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
 
-        uint amount = getPayoutSize(liquidityTokenId, springTokenAddress, tradingPairSeasonalToken);
-        ERC20Interface(springTokenAddress).transfer(tokenOwner, amount);
+        uint256 amount = getPayoutSize(liquidityTokenId, springTokenAddress, tradingPairSeasonalToken);
         setCumulativeSpringTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestSummer(uint liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestSummer(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
 
-        uint amount = getPayoutSize(liquidityTokenId, summerTokenAddress, tradingPairSeasonalToken);
-        ERC20Interface(summerTokenAddress).transfer(tokenOwner, amount);
+        uint256 amount = getPayoutSize(liquidityTokenId, summerTokenAddress, tradingPairSeasonalToken);
         setCumulativeSummerTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestAutumn(uint liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestAutumn(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
 
-        uint amount = getPayoutSize(liquidityTokenId, autumnTokenAddress, tradingPairSeasonalToken);
-        ERC20Interface(autumnTokenAddress).transfer(tokenOwner, amount);
+        uint256 amount = getPayoutSize(liquidityTokenId, autumnTokenAddress, tradingPairSeasonalToken);
         setCumulativeAutumnTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestWinter(uint liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestWinter(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
 
-        uint amount = getPayoutSize(liquidityTokenId, winterTokenAddress, tradingPairSeasonalToken);
-        ERC20Interface(winterTokenAddress).transfer(tokenOwner, amount);
+        uint256 amount = getPayoutSize(liquidityTokenId, winterTokenAddress, tradingPairSeasonalToken);
         setCumulativeWinterTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestAll(uint liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal {
+    function harvestAll(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) 
+            internal returns (uint256, uint256, uint256, uint256) {
 
         uint256 springAmount = harvestSpring(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
         uint256 summerAmount = harvestSummer(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
         uint256 autumnAmount = harvestAutumn(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
         uint256 winterAmount = harvestWinter(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
 
-        emit Harvest(tokenOwner, liquidityTokenId, springAmount, summerAmount, autumnAmount, winterAmount);
+        return (springAmount, summerAmount, autumnAmount, winterAmount);
     }
 
-    function harvest(uint liquidityTokenId) public {
+    function sendHarvestedTokensToOwner(address tokenOwner, uint256 springAmount, uint256 summerAmount,
+                                        uint256 autumnAmount, uint256 winterAmount) internal {
+
+        if (springAmount > 0)
+            ERC20Interface(springTokenAddress).transfer(tokenOwner, springAmount);
+        if (summerAmount > 0)
+            ERC20Interface(summerTokenAddress).transfer(tokenOwner, summerAmount);
+        if (autumnAmount > 0)
+            ERC20Interface(autumnTokenAddress).transfer(tokenOwner, autumnAmount);
+        if (winterAmount > 0)
+            ERC20Interface(winterTokenAddress).transfer(tokenOwner, winterAmount);
+    }
+
+    function harvest(uint256 liquidityTokenId) public {
         
         LiquidityToken storage liquidityToken = liquidityTokens[liquidityTokenId];
         require(msg.sender == liquidityToken.owner, "Only owner can harvest");
-        harvestAll(liquidityTokenId, liquidityToken.owner, liquidityToken.seasonalToken);
+        
+        (uint256 springAmount, 
+         uint256 summerAmount,
+         uint256 autumnAmount,
+         uint256 winterAmount) = harvestAll(liquidityTokenId, 
+                                         liquidityToken.owner, liquidityToken.seasonalToken);
+
+        emit Harvest(liquidityToken.owner, liquidityTokenId, springAmount, summerAmount, autumnAmount, winterAmount);
+        
+        sendHarvestedTokensToOwner(liquidityToken.owner, springAmount, summerAmount, autumnAmount, winterAmount);
     }
 
-    function canWithdraw(uint liquidityTokenId) public view returns (bool) {
+    function canWithdraw(uint256 liquidityTokenId) public view returns (bool) {
 
-        uint depositTime = liquidityTokens[liquidityTokenId].depositTime;
-        uint timeSinceDepositTime = block.timestamp - depositTime;
-        uint daysSinceDepositTime = timeSinceDepositTime / (24 * 60 * 60);
+        uint256 depositTime = liquidityTokens[liquidityTokenId].depositTime;
+        uint256 timeSinceDepositTime = block.timestamp - depositTime;
+        uint256 daysSinceDepositTime = timeSinceDepositTime / (24 * 60 * 60);
 
         return (daysSinceDepositTime) % (WITHDRAWAL_UNAVAILABLE_DAYS + WITHDRAWAL_AVAILABLE_DAYS) 
                     >= WITHDRAWAL_UNAVAILABLE_DAYS;
     }
 
-    function nextWithdrawalTime(uint liquidityTokenId) public view returns (uint256) {
+    function nextWithdrawalTime(uint256 liquidityTokenId) public view returns (uint256) {
         
-        uint depositTime = liquidityTokens[liquidityTokenId].depositTime;
-        uint timeSinceDepositTime = block.timestamp - depositTime;
-        uint withdrawalUnavailableTime = WITHDRAWAL_UNAVAILABLE_DAYS * 24 * 60 * 60;
-        uint withdrawalAvailableTime = WITHDRAWAL_AVAILABLE_DAYS * 24 * 60 * 60;
+        uint256 depositTime = liquidityTokens[liquidityTokenId].depositTime;
+        uint256 timeSinceDepositTime = block.timestamp - depositTime;
+        uint256 withdrawalUnavailableTime = WITHDRAWAL_UNAVAILABLE_DAYS * 24 * 60 * 60;
+        uint256 withdrawalAvailableTime = WITHDRAWAL_AVAILABLE_DAYS * 24 * 60 * 60;
 
         if (timeSinceDepositTime < withdrawalUnavailableTime)
             return depositTime + withdrawalUnavailableTime;
 
-        uint numberOfWithdrawalCyclesUntilNextWithdrawalTime 
+        uint256 numberOfWithdrawalCyclesUntilNextWithdrawalTime 
                     = 1 + (timeSinceDepositTime - withdrawalUnavailableTime) 
                           / (withdrawalUnavailableTime + withdrawalAvailableTime);
 
@@ -444,7 +462,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
                              * (withdrawalUnavailableTime + withdrawalAvailableTime);
     }
 
-    function withdraw(uint liquidityTokenId) external {
+    function withdraw(uint256 liquidityTokenId) external {
 
         require(canWithdraw(liquidityTokenId), "This token cannot be withdrawn at this time");
 
@@ -462,14 +480,14 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         nonfungiblePositionManager.safeTransferFrom(address(this), liquidityToken.owner, liquidityTokenId);
     }
 
-    function removeTokenFromListOfOwnedTokens(address owner, uint index, uint liquidityTokenId) internal {
+    function removeTokenFromListOfOwnedTokens(address owner, uint256 index, uint256 liquidityTokenId) internal {
 
         // to remove an element from a list efficiently, we copy the last element in the list into the
         // position of the element we want to remove, and then remove the last element from the list
 
-        uint length = tokenOfOwnerByIndex[owner].length;
+        uint256 length = tokenOfOwnerByIndex[owner].length;
         if (length > 1) {
-            uint liquidityTokenIdOfLastTokenInList = tokenOfOwnerByIndex[owner][length - 1];
+            uint256 liquidityTokenIdOfLastTokenInList = tokenOfOwnerByIndex[owner][length - 1];
             LiquidityToken memory lastToken = liquidityTokens[liquidityTokenIdOfLastTokenInList];
             lastToken.position = index;
             tokenOfOwnerByIndex[owner][index] = liquidityTokenIdOfLastTokenInList;
