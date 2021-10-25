@@ -56,7 +56,7 @@ At the same time, it prevents more than about one fifth of the total liquidity f
 
 This means that the reallocation of liquidity that occurs when the allocation of farming rewards changes will not happen in a disorderly way, with everybody trying to make the same trade at once, and nobody taking the other side of the trade.
 
-Liquidity providers who are unable to withdraw during the period over which the reallocation occurs will not suffer significant losses in farm income, because, after the reallocation, the farm payout per dollar invested will be the same for the four trading pairs, just as it was before the reallocation. Those who reallocate will have a temporary increase in the number of tokens they receive, which will last only until the reallocation is complete.
+Liquidity providers who are unable to withdraw during the period over which the reallocation occurs will not suffer permanent losses in farm income, because, after the reallocation, the farm payout per dollar invested will be the same for the four trading pairs, just as it was before the reallocation. Those who reallocate will have a temporary increase in the number of tokens they receive, which will last only until the reallocation is complete.
 
 
 ## Implementation
@@ -80,7 +80,7 @@ Miners and mining pools can donate seasonal tokens to the farm by calling the <c
 
 To deposit a liquidity position into the farm, the user calls the <code>safeTransferFrom</code> function of the Uniswap Position Manager contract, and transfers ownership of the non-fungible token representing the liquidity position to the farm. The Uniswap Position Manager contract then calls the <code>onERC721Received</code> function of the farm contract, which records the receipt of that liquidity position token from that user.
 
-When a user has deposited a liquidity position, that user can call the <code>harvest</code> function of the farm contract, which sends all of the tokens distributed to that liquidity position to the user's ethereum address. The user or user interface can call the <code>getPayoutSizes</code> function of the contract to find out how many tokens of the four types are available for haversting.
+When a user has deposited a liquidity position, that user can call the <code>harvest</code> function of the farm contract, which sends all of the tokens distributed to that liquidity position to the user's ethereum address. The user or user interface can call the <code>getPayoutSizes</code> function of the contract to find out how many tokens of the four types are available for harvesting.
 
 Users can withdraw their deposited liquidity position tokens by calling the <code>withdraw</code> function of the farm contract. This harvests their farmed tokens, transfers the liquidity position token back to the user, and records the reduction of the total liquidity in the farm. The farm contract provides a <code>canWithdraw</code> function that reports whether a specific liquidity token can be withdrawn at the present time, as well as a <code>nextWithdrawalTime</code> function that reports the time at which the next withdrawal window will begin.
 
