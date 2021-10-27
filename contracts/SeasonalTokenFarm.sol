@@ -239,6 +239,9 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
     function onERC721Received(address _operator, address _from, uint256 liquidityTokenId, bytes memory _data) 
                              external override returns(bytes4) {
 
+        require(msg.sender == address(nonfungiblePositionManager), 
+                "Only Uniswap v3 liquidity tokens can be deposited");
+
         LiquidityToken memory liquidityToken = getLiquidityToken(liquidityTokenId);
         
         liquidityToken.owner = _from;

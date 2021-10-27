@@ -128,6 +128,13 @@ def test_deposit_revert_not_full_range(accounts, position_manager, farm, weth, s
     with reverts("Liquidity must cover full range of prices"):
         position_manager.safeTransferFrom(accounts[0].address, farm.address, 1, {'from': accounts[0]})
 
+def test_deposit_revert_not_uniswap_v3_token(accounts, position_manager, farm, weth, spring):
+    position_manager_2 = TestNftPositionManager.deploy({'from': accounts[0]})
+    position_manager_2.createLiquidityToken(accounts[0].address, weth.address, spring.address, 
+                                            -887200, 887200, 10000000000, {'from': accounts[0]})
+    with reverts("Only Uniswap v3 liquidity tokens can be deposited"):
+        position_manager_2.safeTransferFrom(accounts[0].address, farm.address, 0, {'from': accounts[0]})
+
 
 @pytest.fixture
 def farm_with_deposit(accounts, position_manager_with_liquidity_token, farm):
