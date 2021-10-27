@@ -2,7 +2,7 @@
 
 ### Abstract
 
-Seasonal tokens become scarce one after another, at mine month intervals, because the rate of production of each token halves nine months after the halving of the previous token. After the rate of production of a token is cut in half, the price can be expected to rise as the market adjusts to the new scarcity. Investors who trade the tokens cyclically can then increase the number of tokens they own over time, by trading the more expensive tokens for the cheaper ones. 
+Seasonal tokens become scarce one after another, at nine month intervals, because the rate of production of each token halves nine months after the halving of the previous token. After the rate of production of a token is cut in half, the price can be expected to rise as the market adjusts to the new scarcity. Investors who trade the tokens cyclically can then increase the number of tokens they own over time, by trading the more expensive tokens for the cheaper ones. 
 
 For this to be a feasible investment strategy, the market must be liquid enough to allow individual traders to make their trades without significantly changing the price, and must also be responsive to the scarcity of the tokens. The seasonal token farm facilitates this by allowing liquidity providers to receive a fraction of the newly mined tokens.
 
