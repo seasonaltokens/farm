@@ -25,7 +25,7 @@ interface INonfungiblePositionManager {
             uint128 tokensOwed0,
             uint128 tokensOwed1
         );
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external payable;
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external;
 }
 
 contract TestNftPositionManager is INonfungiblePositionManager {
@@ -35,13 +35,15 @@ contract TestNftPositionManager is INonfungiblePositionManager {
     mapping(uint => address) public operators;
     mapping(uint => address) public token0s;
     mapping(uint => address) public token1s;
+    mapping(uint => uint24) public fees;
     mapping(uint => int24) public tickLowers;
     mapping(uint => int24) public tickUppers;
     mapping(uint => uint128) public liquidities;
 
     function createLiquidityToken(address operator, 
                                   address token0, 
-                                  address token1, 
+                                  address token1,
+                                  uint24 fee,
                                   int24 tickLower, 
                                   int24 tickUpper,
                                   uint128 liquidity) public returns (uint256) {
@@ -51,6 +53,7 @@ contract TestNftPositionManager is INonfungiblePositionManager {
         operators[tokenId] = operator;
         token0s[tokenId] = token0;
         token1s[tokenId] = token1;
+        fees[tokenId] = fee;
         tickLowers[tokenId] = tickLower;
         tickUppers[tokenId] = tickUpper;
         liquidities[tokenId] = liquidity;
@@ -79,15 +82,16 @@ contract TestNftPositionManager is INonfungiblePositionManager {
         operator = operators[tokenId];
         token0 = token0s[tokenId];
         token1 = token1s[tokenId];
+        fee = fees[tokenId];
         tickLower = tickLowers[tokenId];
         tickUpper = tickUppers[tokenId];
         liquidity = liquidities[tokenId];
 
-        return (0, operator, token0, token1, 
-                0, tickLower, tickUpper, liquidity, 0, 0, 0, 0);
+        return (0, operator, token0, token1, fee,
+                tickLower, tickUpper, liquidity, 0, 0, 0, 0);
     }
 
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external override payable {
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external override {
         bytes memory data;
         require(_from == operators[_tokenId], "Only owner can transfer");
         operators[_tokenId] = _to;
@@ -97,7 +101,7 @@ contract TestNftPositionManager is INonfungiblePositionManager {
                     "onERC721Received failed.");
     }
 
-    function isContract(address _addr) private returns (bool isContract){
+    function isContract(address _addr) private returns (bool) {
         uint32 size;
         assembly {
             size := extcodesize(_addr)

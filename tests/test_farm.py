@@ -2,6 +2,9 @@ import pytest
 from brownie import TestSpringToken, TestNftPositionManager, TestSeasonalTokenFarm
 from brownie import accounts, chain, reverts
 
+correct_fee = 10000
+incorrect_fee = 500
+
 
 @pytest.fixture
 def spring(accounts, chain):
@@ -87,19 +90,20 @@ def test_revert_donate_with_no_liquidity_in_farm(accounts, farm, winter):
 def test_create_liquidity_token(accounts, position_manager, weth, winter):
     assert position_manager.numberOfTokens() == 0
     liquidity_token_id = position_manager.numberOfTokens()
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, winter.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, winter.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
     assert position_manager.numberOfTokens() == 1
 
 @pytest.fixture
 def position_manager_with_liquidity_token(accounts, position_manager, weth, winter):
     liquidity_token_id = position_manager.numberOfTokens()
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, winter.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, winter.address,  correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
     return position_manager
 
 def test_deposit_liquidity_token(accounts, position_manager_with_liquidity_token, farm):
     liquidity_token_id = position_manager_with_liquidity_token.numberOfTokens() - 1
+    assert position_manager_with_liquidity_token.fees(liquidity_token_id) == correct_fee
     position_manager_with_liquidity_token.safeTransferFrom(accounts[0].address, 
                                                            farm.address, liquidity_token_id, 
                                                            {'from': accounts[0]})
@@ -107,30 +111,36 @@ def test_deposit_liquidity_token(accounts, position_manager_with_liquidity_token
     assert farm.tokenOfOwnerByIndex(accounts[0].address, 0) == liquidity_token_id
 
 def test_deposit_revert_weth_not_in_trading_pair(accounts, position_manager, farm, spring, summer):
-    position_manager.createLiquidityToken(accounts[0].address, spring.address, summer.address, 
+    position_manager.createLiquidityToken(accounts[0].address, spring.address, summer.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
     with reverts("Invalid trading pair"):
         position_manager.safeTransferFrom(accounts[0].address, farm.address, 0, {'from': accounts[0]})
 
 def test_deposit_revert_seasonal_token_not_in_trading_pair(accounts, position_manager, farm, weth):
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, weth.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, weth.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
     with reverts("Invalid trading pair"):
         position_manager.safeTransferFrom(accounts[0].address, farm.address, 0, {'from': accounts[0]})
 
 def test_deposit_revert_not_full_range(accounts, position_manager, farm, weth, spring):
-    position_manager.createLiquidityToken(accounts[0].address, spring.address, weth.address, 
+    position_manager.createLiquidityToken(accounts[0].address, spring.address, weth.address, correct_fee,
                                           -887100, 887200, 10000000000, {'from': accounts[0]})
-    position_manager.createLiquidityToken(accounts[0].address, spring.address, weth.address, 
+    position_manager.createLiquidityToken(accounts[0].address, spring.address, weth.address, correct_fee,
                                           -887200, 887100, 10000000000, {'from': accounts[0]})
     with reverts("Liquidity must cover full range of prices"):
         position_manager.safeTransferFrom(accounts[0].address, farm.address, 0, {'from': accounts[0]})
     with reverts("Liquidity must cover full range of prices"):
         position_manager.safeTransferFrom(accounts[0].address, farm.address, 1, {'from': accounts[0]})
 
+def test_deposit_revert_wrong_fee_tier(accounts, position_manager, farm, weth, spring):
+    position_manager.createLiquidityToken(accounts[0].address, spring.address, weth.address, incorrect_fee,
+                                          -887200, 887200, 10000000000, {'from': accounts[0]})
+    with reverts("Fee tier must be 1%"):
+        position_manager.safeTransferFrom(accounts[0].address, farm.address, 0, {'from': accounts[0]})
+
 def test_deposit_revert_not_uniswap_v3_token(accounts, position_manager, farm, weth, spring):
     position_manager_2 = TestNftPositionManager.deploy({'from': accounts[0]})
-    position_manager_2.createLiquidityToken(accounts[0].address, weth.address, spring.address, 
+    position_manager_2.createLiquidityToken(accounts[0].address, weth.address, spring.address, correct_fee,
                                             -887200, 887200, 10000000000, {'from': accounts[0]})
     with reverts("Only Uniswap v3 liquidity tokens can be deposited"):
         position_manager_2.safeTransferFrom(accounts[0].address, farm.address, 0, {'from': accounts[0]})
@@ -150,6 +160,11 @@ def test_donate(accounts, farm_with_deposit, winter):
     winter.safeApproveAndCall(farm_with_deposit.address, 0, int(10**18), bytes(), {'from': accounts[0]})
     assert winter.balanceOf(accounts[0].address) == 0
     assert winter.balanceOf(farm_with_deposit.address) == int(10**18)
+
+def test_revert_donate_not_seasonal_token(accounts, farm_with_deposit, weth):
+    weth.setBalance(accounts[0].address, int(10**18))
+    with reverts("Only Seasonal Tokens can be donated"):
+        weth.safeApproveAndCall(farm_with_deposit.address, 0, int(10**18), bytes(), {'from': accounts[0]})
 
 
 @pytest.fixture
@@ -224,13 +239,13 @@ def test_next_withdrawal_time(accounts, position_manager_with_liquidity_token, f
 @pytest.fixture
 def position_manager_with_four_liquidity_tokens(accounts, position_manager, 
                                                 weth, spring, summer, autumn, winter):
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, spring.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, spring.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, summer.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, summer.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, autumn.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, autumn.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
-    position_manager.createLiquidityToken(accounts[0].address, weth.address, winter.address, 
+    position_manager.createLiquidityToken(accounts[0].address, weth.address, winter.address, correct_fee,
                                           -887200, 887200, 10000000000, {'from': accounts[0]})
     return position_manager
 

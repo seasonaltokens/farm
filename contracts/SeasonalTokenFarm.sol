@@ -1,5 +1,3 @@
-// Seasonal Token Farm
-
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.5;
 pragma abicoder v2;
@@ -7,6 +5,28 @@ pragma abicoder v2;
 import "../interfaces/ERC20.sol";
 import "../interfaces/ERC721TokenReceiver.sol";
 import "../interfaces/ApproveAndCallFallBack.sol";
+import "./safeTransferFrom.sol";
+
+
+/*
+ * Seasonal Token Farm
+ *
+ * This contract receives donations of seasonal tokens and distributes them to providers of liquidity
+ * for the token/ETH trading pairs on Uniswap v3.
+ *
+ * Warning: Tokens can be lost if they are not transferred to the farm contract in the correct way.
+ *
+ * Seasonal tokens must be donated using the safeApproveAndCall() function of the seasonal token contracts.
+ * Tokens sent directly to the farm address will be lost.
+ *
+ * Contracts that deposit Uniswap liquidy tokens need to implement the onERC721Received() function in order
+ * to be able to withdraw those tokens. Any contracts that interact with the farm must be tested prior to 
+ * deployment on the main network.
+ * 
+ * The developers accept no responsibility for tokens irretrievably lost in accidental transfers.
+ * 
+ */
+
 
 
 interface INonfungiblePositionManager {
@@ -27,7 +47,7 @@ interface INonfungiblePositionManager {
             uint128 tokensOwed0,
             uint128 tokensOwed1
         );
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external payable;
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external;
 }
 
 
@@ -43,6 +63,7 @@ struct LiquidityToken {
     uint256 position;
 }
 
+
 contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
 
     // The Seasonal Token Farm runs on voluntary donations.
@@ -53,17 +74,30 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
     // equal to that trading pair's allocationSize divided by the sum of the allocationSizes.
 
     // The initial allocationSizes are 5, 6, 7 and 8 for Spring, Summer, Autumn and Winter.
-    // A few months after each token's halving, the allocationSize for the ETH/Token trading pair
-    // doubles. So after the first Spring halving, the allocationSizes will be 10, 6, 7 and 8.
-    // After the first Summer halving, they will be 10, 12, 7 and 8.
+    // Four months after each token's halving, the allocationSize for the ETH/Token trading pair
+    // doubles. 
+    //
+    // When the doubling of the Winter allocation occurs, the allocationSizes become 10, 12, 14 and 16,
+    // which are simplified to 5, 6, 7, 8, and then the cycle repeats.
+
+    // Initially, the allocationSizes will be 5, 6, 7 and 8.
+    //
+    // After the Spring halving, they will be 10, 6, 7 and 8.
+    // After the Summer halving, they will be 10, 12, 7 and 8.
+    // After the Autumn halving, they will be 10, 12, 14 and 8.
+    // After the Winter halving, they will be 5, 6, 7 and 8 again.
+
+    // The reduction of the allocationSizes from 10, 12, 14, 16 to 5, 6, 7, 8 doesn't change the
+    // payouts received. The fraction of farm rewards allocated to Spring, for example, 
+    // is 10/(10+12+14+16) = 5/(5+6+7+8).
 
     uint256 public constant REALLOCATION_INTERVAL = (365 * 24 * 60 * 60 * 3) / 4; // 9 months
 
 
     // Liquidity positions must cover the full range of prices
 
-    int24 public constant MINIMUM_TICK_UPPER = 887200;
-    int24 public constant MAXIMUM_TICK_LOWER = -887200;
+    int24 public constant REQUIRED_TICK_UPPER = 887200;
+    int24 public constant REQUIRED_TICK_LOWER = -887200;
 
 
     // Liquidity tokens can be withdrawn for 7 days out of every 37.
@@ -227,16 +261,20 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         receiveSeasonalTokens(from, token, tokens);
     }
 
-    function receiveSeasonalTokens(address from, address tokenAddress, uint256 amount) public {
+    function receiveSeasonalTokens(address from, address tokenAddress, uint256 amount) internal {
+
+        require(msg.sender == springTokenAddress || msg.sender == summerTokenAddress
+                || msg.sender == autumnTokenAddress || msg.sender == winterTokenAddress,
+                "Only Seasonal Tokens can be donated");
         
         allocateIncomingTokensToTradingPairs(tokenAddress, amount);
 
         emit Donate(from, tokenAddress, amount);
 
-        ERC20Interface(tokenAddress).transferFrom(from, address(this), amount);
+        SafeERC20.safeTransferFrom(ERC20Interface(tokenAddress), from, address(this), amount);
     }
-    
-    function onERC721Received(address _operator, address _from, uint256 liquidityTokenId, bytes memory _data) 
+
+    function onERC721Received(address _operator, address _from, uint256 liquidityTokenId, bytes calldata _data) 
                              external override returns(bytes4) {
 
         require(msg.sender == address(nonfungiblePositionManager), 
@@ -279,39 +317,43 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         int24 tickLower;
         int24 tickUpper;
         uint256 liquidity;
+        uint24 fee;
         
-        (token0, token1, tickLower, tickUpper, liquidity) = getPositionDataForLiquidityToken(tokenId);
+        (token0, token1, fee, tickLower, tickUpper, liquidity) = getPositionDataForLiquidityToken(tokenId);
         liquidityToken.liquidity = liquidity;
         
         if (token0 == wethAddress)
             liquidityToken.seasonalToken = token1;
         else if (token1 == wethAddress)
             liquidityToken.seasonalToken = token0;
-        else
-            revert("Invalid trading pair");
 
-        if (liquidityToken.seasonalToken != springTokenAddress &&
-            liquidityToken.seasonalToken != summerTokenAddress &&
-            liquidityToken.seasonalToken != autumnTokenAddress &&
-            liquidityToken.seasonalToken != winterTokenAddress)
-            revert("Invalid trading pair");
+        require(liquidityToken.seasonalToken == springTokenAddress ||
+                liquidityToken.seasonalToken == summerTokenAddress ||
+                liquidityToken.seasonalToken == autumnTokenAddress ||
+                liquidityToken.seasonalToken == winterTokenAddress,
+                "Invalid trading pair");
 
-        if (tickLower > MAXIMUM_TICK_LOWER || tickUpper < MINIMUM_TICK_UPPER)
-            revert("Liquidity must cover full range of prices");
+        require(tickLower == REQUIRED_TICK_LOWER && tickUpper == REQUIRED_TICK_UPPER,
+                "Liquidity must cover full range of prices");
+
+        require(fee == 10000, "Fee tier must be 1%");
 
         return liquidityToken;
     }
 
     function getPositionDataForLiquidityToken(uint256 tokenId) 
-                                             internal view returns (address, address, int24, int24, uint256){
+                                             internal view returns (address, address, uint24, int24, int24, uint256){
         address token0;
         address token1;
         int24 tickLower;
         int24 tickUpper;
         uint256 liquidity;
-        (,, token0, token1,, tickLower, tickUpper, liquidity,,,,) 
+        uint24 fee;
+
+        (,, token0, token1, fee, tickLower, tickUpper, liquidity,,,,) 
             = nonfungiblePositionManager.positions(tokenId);
-        return (token0, token1, tickLower, tickUpper, liquidity);
+
+        return (token0, token1, fee, tickLower, tickUpper, liquidity);
     }
 
     function setCumulativeSpringTokensFarmedToCurrentValue(uint256 liquidityTokenId, address seasonalToken) internal {
@@ -335,7 +377,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
     }
 
     function getPayoutSize(uint256 liquidityTokenId, address farmedSeasonalToken, 
-                           address tradingPairSeasonalToken) internal view returns (uint256){
+                           address tradingPairSeasonalToken) internal view returns (uint256) {
 
         uint256 initialCumulativeTokensFarmed;
 
@@ -356,7 +398,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
                 * liquidityTokens[liquidityTokenId].liquidity) / (2 ** 128);
     }
 
-    function getPayoutSizes(uint256 liquidityTokenId) public view returns (uint256, uint256, uint256, uint256) {
+    function getPayoutSizes(uint256 liquidityTokenId) external view returns (uint256, uint256, uint256, uint256) {
 
         address tradingPairSeasonalToken = liquidityTokens[liquidityTokenId].seasonalToken;
 
@@ -368,41 +410,41 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         return (springPayout, summerPayout, autumnPayout, winterPayout);
     }
 
-    function harvestSpring(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestSpring(uint256 liquidityTokenId, address tradingPairSeasonalToken) internal returns(uint256) {
 
         uint256 amount = getPayoutSize(liquidityTokenId, springTokenAddress, tradingPairSeasonalToken);
         setCumulativeSpringTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestSummer(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestSummer(uint256 liquidityTokenId, address tradingPairSeasonalToken) internal returns(uint256) {
 
         uint256 amount = getPayoutSize(liquidityTokenId, summerTokenAddress, tradingPairSeasonalToken);
         setCumulativeSummerTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestAutumn(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestAutumn(uint256 liquidityTokenId, address tradingPairSeasonalToken) internal returns(uint256) {
 
         uint256 amount = getPayoutSize(liquidityTokenId, autumnTokenAddress, tradingPairSeasonalToken);
         setCumulativeAutumnTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestWinter(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) internal returns(uint256) {
+    function harvestWinter(uint256 liquidityTokenId, address tradingPairSeasonalToken) internal returns(uint256) {
 
         uint256 amount = getPayoutSize(liquidityTokenId, winterTokenAddress, tradingPairSeasonalToken);
         setCumulativeWinterTokensFarmedToCurrentValue(liquidityTokenId, tradingPairSeasonalToken);
         return amount;
     }
 
-    function harvestAll(uint256 liquidityTokenId, address tokenOwner, address tradingPairSeasonalToken) 
+    function harvestAll(uint256 liquidityTokenId, address tradingPairSeasonalToken) 
             internal returns (uint256, uint256, uint256, uint256) {
 
-        uint256 springAmount = harvestSpring(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
-        uint256 summerAmount = harvestSummer(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
-        uint256 autumnAmount = harvestAutumn(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
-        uint256 winterAmount = harvestWinter(liquidityTokenId, tokenOwner, tradingPairSeasonalToken);
+        uint256 springAmount = harvestSpring(liquidityTokenId, tradingPairSeasonalToken);
+        uint256 summerAmount = harvestSummer(liquidityTokenId, tradingPairSeasonalToken);
+        uint256 autumnAmount = harvestAutumn(liquidityTokenId, tradingPairSeasonalToken);
+        uint256 winterAmount = harvestWinter(liquidityTokenId, tradingPairSeasonalToken);
 
         return (springAmount, summerAmount, autumnAmount, winterAmount);
     }
@@ -420,7 +462,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
             ERC20Interface(winterTokenAddress).transfer(tokenOwner, winterAmount);
     }
 
-    function harvest(uint256 liquidityTokenId) public {
+    function harvest(uint256 liquidityTokenId) external {
         
         LiquidityToken storage liquidityToken = liquidityTokens[liquidityTokenId];
         require(msg.sender == liquidityToken.owner, "Only owner can harvest");
@@ -428,12 +470,11 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
         (uint256 springAmount, 
          uint256 summerAmount,
          uint256 autumnAmount,
-         uint256 winterAmount) = harvestAll(liquidityTokenId, 
-                                         liquidityToken.owner, liquidityToken.seasonalToken);
+         uint256 winterAmount) = harvestAll(liquidityTokenId, liquidityToken.seasonalToken);
 
-        emit Harvest(liquidityToken.owner, liquidityTokenId, springAmount, summerAmount, autumnAmount, winterAmount);
+        emit Harvest(msg.sender, liquidityTokenId, springAmount, summerAmount, autumnAmount, winterAmount);
         
-        sendHarvestedTokensToOwner(liquidityToken.owner, springAmount, summerAmount, autumnAmount, winterAmount);
+        sendHarvestedTokensToOwner(msg.sender, springAmount, summerAmount, autumnAmount, winterAmount);
     }
 
     function canWithdraw(uint256 liquidityTokenId) public view returns (bool) {
@@ -446,7 +487,7 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
                     >= WITHDRAWAL_UNAVAILABLE_DAYS;
     }
 
-    function nextWithdrawalTime(uint256 liquidityTokenId) public view returns (uint256) {
+    function nextWithdrawalTime(uint256 liquidityTokenId) external view returns (uint256) {
         
         uint256 depositTime = liquidityTokens[liquidityTokenId].depositTime;
         uint256 timeSinceDepositTime = block.timestamp - depositTime;
@@ -473,13 +514,18 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
 
         require(msg.sender == liquidityToken.owner, "Only owner can withdraw");
 
-        harvest(liquidityTokenId);
+        (uint256 springAmount, 
+         uint256 summerAmount,
+         uint256 autumnAmount,
+         uint256 winterAmount) = harvestAll(liquidityTokenId, liquidityToken.seasonalToken);
 
         totalLiquidity[liquidityToken.seasonalToken] -= liquidityToken.liquidity;
-        removeTokenFromListOfOwnedTokens(liquidityToken.owner, liquidityToken.position, liquidityTokenId);
-
+        removeTokenFromListOfOwnedTokens(msg.sender, liquidityToken.position, liquidityTokenId);
+        
+        emit Harvest(msg.sender, liquidityTokenId, springAmount, summerAmount, autumnAmount, winterAmount);
         emit Withdraw(msg.sender, liquidityTokenId);
 
+        sendHarvestedTokensToOwner(msg.sender, springAmount, summerAmount, autumnAmount, winterAmount);
         nonfungiblePositionManager.safeTransferFrom(address(this), liquidityToken.owner, liquidityTokenId);
     }
 
@@ -501,4 +547,3 @@ contract SeasonalTokenFarm is ERC721TokenReceiver, ApproveAndCallFallBack {
     }
 
 }
-        
